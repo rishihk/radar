@@ -23,6 +23,7 @@ import (
 	"github.com/skyhook-io/radar/internal/config"
 	"github.com/skyhook-io/radar/internal/diagnosecli"
 	"github.com/skyhook-io/radar/internal/k8s"
+	"github.com/skyhook-io/radar/internal/meaningfulchanges"
 	mcppkg "github.com/skyhook-io/radar/internal/mcp"
 	"github.com/skyhook-io/radar/internal/memlimit"
 	"github.com/skyhook-io/radar/internal/reachability"
@@ -109,6 +110,7 @@ func main() {
 	debugImage := flag.String("debug-image", fileCfg.DebugImage, "Image for ephemeral debug containers and node debug pods (empty = busybox:latest; point at a mirror for air-gapped/private-registry clusters)")
 	reachabilityImage := flag.String("reachability-image", fileCfg.ReachabilityImage, "Image for the in-cluster reachability probe Job (empty = RADAR_IMAGE env, then the version-matched published Radar image; point at a mirror for air-gapped clusters)")
 	listPageSize := flag.Int64("list-page-size", 0, "Paginate the initial LIST of high-cardinality kinds (Pods, ReplicaSets) at this page size on clusters without WatchList streaming. 0 = off (single LIST). Try 2000 if a very large cluster fails to sync.")
+	changesOtherKinds := flag.Bool("changes-other-kinds", os.Getenv("RADAR_CHANGES_OTHER_KINDS") != "false", "List desired-state edits, creates and deletes of custom resources and Nodes in the MCP get_changes feed when no kind or name is given; false lists only the curated kinds there. Env: RADAR_CHANGES_OTHER_KINDS")
 	namespaceScope := flag.Bool("namespace-scope", false, "Scope namespaced informer caches to a single namespace (multiple namespaces are not supported yet). Requires --namespace or a kubeconfig context namespace. Local mode can rescope by switching namespaces; auth/cloud mode locks to the startup namespace.")
 	// Timeline storage options
 	timelineStorage := flag.String("timeline-storage", fileCfg.TimelineStorageOr("memory"), "Timeline storage backend: memory, sqlite, or postgres")
@@ -202,6 +204,7 @@ func main() {
 	if *noVersionCheck {
 		versionpkg.SetDisabled(true)
 	}
+	meaningfulchanges.SetOtherKinds(*changesOtherKinds)
 	if *workloadSingleCluster || len(workloadClusterLabels) > 0 {
 		if _, err := (prom.WorkloadMetricsScope{SingleCluster: *workloadSingleCluster, ClusterLabels: workloadClusterLabels}).Matchers(); err != nil {
 			log.Fatalf("Invalid workload metrics scope: %v", err)
